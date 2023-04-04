@@ -1,131 +1,139 @@
 
 ## ADNL TCP + Liteserver
-Это протокол нижнего уровня, на котором построено все взаимодействие в сети TON, он может работать поверх любого протокола, но чаще всего применяется поверх TCP и UDP. UDP применяется для общения между нодами, а TCP для коммуникации с lite-серверами.
 
-Сейчас мы разберем ADNL работающий поверх TCP и научимся взаимодействовать с лайт-серверами напрямую.
+ADNL TCP + Liteserver 是 TON 網路中構建所有互動的底層協議，它可以在任何協議上運作，但通常在 TCP 和 UDP 協議上運作。UDP 用於節點之間的通訊，而 TCP 用於與輕型伺服器通訊。
 
-В TCP версии ADNL, в качестве адресов, узлы сети используют публичные ключи ed25519 и устанавливают соединение, используя общий ключ, полученный с помощью процедуры Диффи-Хелмана для эллиптических кривых - ECDH.
+現在我們將介紹在 TCP 上運作的 ADNL，並學習如何直接與輕型伺服器進行互動。
 
-### Структура пакетов
-Каждый ADNL TCP пакет, кроме хэндшейка, имеет структуру:
-* 4 байта размера пакета в little endian (N)
-* 32 байта nonce [[?]](## "Случайные байты, для защиты от атак на чексумму")
-* (N - 64) байт полезных данных
-* 32 байта чексумма SHA256 от nonce и полезных данных
+在 ADNL 的 TCP 版本中，網路節點使用公鑰 ed25519 作為地址，並使用橢圓曲線 Diffie-Hellman 程序獲取的共享密鑰建立連接。
 
-Весь пакет, включая размер, зашифрован **AES-CTR**.
-После расшифровки - нужно обязательно проверить, сходится ли чексумма с данными, для проверки нужно просто посчитать чексумму самостоятельно и сравнить результат с тем, что у нас в пакете.
+### 封包結構
 
-Хэндшейк пакет - исключение, он передается в частично открытом виде и описан в следующей главе.
+除了握手機制（Handshake）封包之外，每個 ADNL TCP 包都具有以下結構：
 
+* 4 個位元組的 little endian 格式的封包大小（N）
+* 32 個位元組的 nonce（以防校驗和攻擊）
+* (N-64) 位元組的有效資料
+* 32 個位元組的 SHA256 校驗用於 nonce 和有效資料
 
-### Установка соединения
-Для установки соединения нам нужно знать ip, порт и публичный ключ сервера, и сгенерировать свой приватный и публичный ключ ed25519. 
+整個封包，包括大小，都使用 AES-CTR 加密。在解密後，必須驗證校驗和是否與資料相符。為了進行驗證，只需自行計算校驗和並將結果與包中的校驗和進行比較。
 
-Данные публичных серверов такие как ip, порт и ключ можно получить из [конфига](https://ton-blockchain.github.io/global.config.json). Айпи в конфиге в числовом виде, в нормальный вид его можно привести используя, например [этот инстурмент](https://www.browserling.com/tools/dec-to-ip). Публичный ключ в конфиге в base64 формате.
+握手包是個例外，它以部分開放的形式傳遞，並在下一節中進行描述。
 
-Клиент генерирует 160 случайных байт, часть из которых будет использоваться сторонами в качестве основы для AES шифрования. 
+整個封包，包括尺寸，都是使用 **AES-CTR** 加密的。在解密後，必須確認檢查和是否與資料相符，檢查和可以自行計算並與封包中的結果進行比較以進行確認。
 
-Из них создаются 2 постоянных AES-CTR шифра, которые будут использоваться сторонами для шифрования/дешифрования сообщений после хэндшейка.
-* Шифр A - ключ 0 - 31 байты, iv 64 - 79 байты
-* Шифр B - ключ 32 - 63 байты, iv 80 - 95 байты
+握手封包是一個例外，它是以部分開放的方式傳輸的，並在下一節中進行了描述。
 
-Шифры применяются в таком порядке:
-* Шифр A используется сервером для шифрования отправляемых сообщений.
-* Шифр A используется клиентом для дешифрования полученных сообщений.
-* Шифр B используется клиентом для шифрования отправляемых сообщений.
-* Шифр B используется сервером для дешифрования полученных сообщений.
+### 建立連接
+要建立連接，我們需要知道伺服器的 IP、端口和公鑰，並生成自己的 Ed25519 私鑰和公鑰。
 
-Для установки соединения клиент должен отправить хэндшейк пакет, содержащий:
-* [32 байта] **Айди ключа сервера** [[Подробнее]](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B0%D0%B9%D0%B4%D0%B8-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0)
-* [32 байта] **Наш публичный ключ ed25519**
-* [32 байта] **SHA256 хэш от наших 160 байт**
-* [160 байт] **Наши 160 байт в зашифрованом виде** [[Подробнее]](#%D1%88%D0%B8%D1%84%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-handshake-%D0%BF%D0%B0%D0%BA%D0%B5%D1%82%D0%B0)
+可以從[配置文件](https://ton-blockchain.github.io/global.config.json)中獲得伺服器的公開資訊，例如 IP、端口和鑰匙。在配置文件中，IP 是以數字形式表示的，可以使用像[這樣的工具](https://www.browserling.com/tools/dec-to-ip)將其轉換為正常形式。公鑰以 Base64 格式在配置文件中提供。
+
+客戶端生成 160 個隨機位元組，其中一部分將用作 AES 加密的基礎。從中建立了 2 個永久 AES-CTR 加密，這將在握手後由雙方用於加密 / 解密訊息。
+
+* 加密 A - 金鑰 0-31 位元組，iv 64-79 位元組
+* 加密 B - 金鑰 32-63 位元組，iv 80-95 位元組
 
 
-При получении хэндшейк пакета, сервер проделает те же самые действия у себя, получит ECDH ключ, расшифрует 160 байт и создаст 2 постоянных ключа. Если все получится, сервер ответит пустым ADNL пакетом, без полезных данных, для дешифровки которого (а также последующих) нужно использовать один из постоянных шифров. 
+這些加密按以下順序應用：
 
-С этого момента можно считать соединение установленным.
+* 伺服器使用加密 A 加密發送的消息。
+* 客戶端使用加密 A 解密收到的消息。
+* 客戶端使用加密 B 加密發送的消息。
+* 伺服器使用加密 B 解密收到的消息。
+為了建立連接，客戶端必須發送一個握手封包，其中包含：
 
-## Обмен данными
-После того, как мы установили соединение, мы можем приступать к получению информации, для сериализации данных используется язык TL.
+* [32 字節] 伺服器金鑰 ID [更多資訊](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B0%D0%B9%D0%B4%D0%B8-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0)
+* [32 字節] 我們的 ed25519 公鑰
+* [32 字節] 我們 160 字節的 SHA256 哈希值
+* [160 字節] 我們的 160 字節加密後的數據  [更多資訊](#%D1%88%D0%B8%D1%84%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-handshake-%D0%BF%D0%B0%D0%BA%D0%B5%D1%82%D0%B0)
 
-[Подробнее про TL](/TL.md)
+接收到握手包後，伺服器在自己端進行同樣的操作，獲取 ECDH 金鑰，解密 160 個字節並創建 2 個永久的金鑰。如果一切順利，伺服器將回傳一個空的 ADNL 包，沒有有效數據，為了解密它（以及後續的數據），需要使用其中一個永久加密。
 
-### Ping&Pong
-Ping пакет оптимально отправлять примерно раз в 5 секунд. Это нужно для поддержания соединения, пока обмен данными не происходит, иначе сервер оборвет соединение.
+從這一刻開始，可以認為連接已經建立。
 
-Ping пакет, как и все остальные, строится по стандартной схеме, описанной [выше](#структура-пакетов), и в качестве полезных данных несет идентификатор и айди запроса. 
+## 數據交換
 
-Найдем нужную схему для пинг запроса [тут](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L35) и вычислим айди схемы, как
-`crc32_IEEEE("tcp.ping random_id:long = tcp.Pong")`. При конвертации в байты с порядком little endian получим **9a2b084d**.
+在建立連接後，可以開始接收訊息，使用 TL 語言進行數據序列化。
+[更多關於 TL 的資訊]((/TL.md))
 
-Таким образом наш ADNL ping пакет будет выглядеть так:
-* 4 байта размера пакета в little endian -> 64 + (4+8) = **76**
-* 32 байта nonce -> случайные 32 байта
-* 4 байта ID TL схемы -> **9a2b084d**
-* 8 байт айди запроса -> случайное число uint64 
-* 32 байта чексумма SHA256 от nonce и полезных данных
+### Ping & Pong
 
-Отправляем наш пакет и в ответ ждем [tcp.pong](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L23), `random_id` будет равен тому, который мы отправили в ping.
+Ping 封包最好每 5 秒左右發送一次，以維持連接，如果在交換數據之前沒有發送，則伺服器將斷開連接。
 
-### Получение информации от лайт сервера
-Все запросы, которые направлены на получение информации из блокчеина, обернуты в [LiteServer Query](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L83) схему, которая в свою очередь обернута в [ADNL Query](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L22) схему.
+Ping 包和其他包一樣，遵循 [上面](#структура-пакетов) 描述的標準方案，其有效數據包括 ID 和請求 ID。
+
+可以在 [這裡](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L35) 找到 ping 請求的正確方案，並計算方案 ID，如下所示：`crc32_IEEEE("tcp.ping random_id:long = tcp.Pong")`。在使用小端序轉換為字節時，ID 為 **9a2b084d**。
+
+因此，我們的 ADNL ping 包將如下所示：
+
+* 4 字節的小端序包大小 -> 64 + (4+8) = 76
+* 32 字節的 nonce -> 32 個隨機字節
+* 4 字節的 TL 方案 ID -> **9a2b084d**
+* 8 字節的請求 ID -> 隨機 uint64 數字
+* SHA256 摘要的 32 個字節，是由 nonce 和有用的數據計算而得
+
+我們發送我們的包，然後等待回覆的 [tcp.pong](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L23)，其中的 `random_id` 將等於我們發送的 ping 的值。
+
+### 從輕量級服務器獲取訊息
+
+所有向區塊鏈獲取信息的請求都被封裝在 [LiteServer Query](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L83) 方案中，該方案本身又被封裝在 [ADNL Query](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L2) 方案中。
 
 LiteQuery:
-`liteServer.query data:bytes = Object`, айди **df068c79**
+`liteServer.query data:bytes = Object`, ID 是 **df068c79**
 
 ADNLQuery:
-`adnl.message.query query_id:int256 query:bytes = adnl.Message`, айди **7af98bb4**
+`adnl.message.query query_id:int256 query:bytes = adnl.Message`, ID 是 **7af98bb4**
 
-LiteQuery передается внутри ADNLQuery, как `query:bytes`, а конечный запрос передается внутри LiteQuery, как `data:bytes`.
+LiteQuery 被傳遞到 ADNLQuery 內部作為 `query:bytes`，最終請求作為 `data:bytes` 在 LiteQuery 內部傳遞。
 
-[Разбор кодирования bytes в TL](/TL.md)
+[TL 中的字節編碼解析](/TL.md)
 
-#### Получение полезных данных
-Теперь, так как мы уже умеем формировать TL пакеты для Lite API, мы можем запросить информацию о текущем блоке мастерчеина TON. Блок мастерчеина используется во многих дальнейших запросах, как входящий параметр, для индикации состояния (момента), в котором нам нужна информация.
+#### 獲取有用數據
+
+現在，由於我們已經知道如何為 Lite API 構建 TL 包，我們可以請求有關 TON 主控鏈當前區塊的資訊。主控鏈區塊在許多後續請求中都被用作輸入參數，用於指示我們需要的訊息狀態（時間點）。
 
 ##### getMasterchainInfo
-Ищем нужную нам [TL схему](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L60), вычисляем ее айди и строим пакет:
+尋找我們需要的 [TL 方案](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L60)，計算其 ID 並構建封包：
 
-* 4 байта размера пакета в little endian -> 64 + (4+32+(1+4+(1+4+3)+3)) = **116**
-* 32 байта nonce -> случайные 32 байта
-* 4 байта ID ADNLQuery схемы -> **7af98bb4**
-* 32 байта `query_id:int256` -> случайные 32 байта
-* * 1 байт размер массива -> **12**
-* * 4 байта ID LiteQuery схемы -> **df068c79**
-* * * 1 байт размер массива -> **4**
-* * * 4 байта ID getMasterchainInfo схемы -> **2ee6b589**
-* * * 3 нулевых байта падинга (выравнивание к 8)
-* * 3 нулевых байта падинга (выравнивание к 16)
-* 32 байта чексумма SHA256 от nonce и полезных данных
+* 4個字節的封包大小（little endian）-> 64 + (4+32+(1+4+(1+4+3)+3)) = **116**
+* 32 個字節的 nonce -> 隨機的 32 個字節
+* 4個字節的 ADNLQuery 方案ID -> **7af98bb4**
+* 32個字節的 `query_id:int256` -> 隨機的32個字節
+* 1 個字節的數組大小 -> **12**
+* 4 個字節的 LiteQuery 方案 ID -> **df068c79**
+* 1個字節的數組大小 -> **4**
+* 4 個字節的 getMasterchainInfo 方案 ID -> **2ee6b589**
+* 3 個零填充字節（按 8 字節對齊）
+* 3 個零填充字節（按 16 字節對齊）
+* 32 個字節 SHA256 摘要的校驗和，由 nonce 和有用的數據計算而得。
 
-Пример пакета в hex:
+封包的十六進位範例
 ```
-74000000                                                             -> размер пакета (116)
+74000000                                                             -> 封包大小 (116)
 5fb13e11977cb5cff0fbf7f23f674d734cb7c4bf01322c5e6b928c5d8ea09cfd     -> nonce
   7af98bb4                                                           -> ADNLQuery
   77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4   -> query_id
-    0c                                                               -> размер массива
+    0c                                                               -> 陣列大小
     df068c79                                                         -> LiteQuery
-      04                                                             -> размер массива
+      04                                                             -> 陣列大小
       2ee6b589                                                       -> getMasterchainInfo
-      000000                                                         -> 3 байта падинг
-    000000                                                           -> 3 байта падинг
+      000000                                                         -> 3 個填充字節
+    000000                                                           -> 3 個填充字節
 ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
 ```
 
-В ответ мы ожидаем получить [liteServer.masterchainInfo](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L30), состоящий из last:[ton.blockIdExt](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/tonlib_api.tl#L51) state_root_hash:int256 и init:[tonNode.zeroStateIdExt](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L359).
+我們期望收到的回覆是由 [liteServer.masterchainInfo](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L30) 構成的，其中包含 last:[ton.blockIdExt](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/tonlib_api.tl#L51) state_root_hash:int256 和 init:[tonNode](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L359).zeroStateIdExt。
 
-Полученый пакет десериализуется тем же самым образом, что и отправленый, - тот же алгоритм, но в обратную сторону, разве что ответ завернут только в [ADNLAnswer](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L23).
+獲得的封包與發送的封包以相同的方式反序列化 - 使用相同的算法，只是反過來，唯一的區別在於回覆僅被封裝在 [ADNLAnswer](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L23) 內。
 
 После расшифровки ответа, получаем пакет вида:
 ```
-20010000                                                                  -> размер пакета (288)
+20010000                                                                  -> 封包大小 (288)
 5558b3227092e39782bd4ff9ef74bee875ab2b0661cf17efdfcd4da4e53e78e6          -> nonce
   1684ac0f                                                                -> ADNLAnswer
-  77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4        -> query_id (идентичен запросу)
-    b8                                                                    -> размер массива
+  77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4        -> query_id (與請求相同)
+    b8                                                                    -> 數組大小
     81288385                                                              -> liteServer.masterchainInfo
                                                                           last:tonNode.blockIdExt
         ffffffff                                                          -> workchain:int
@@ -138,37 +146,41 @@ ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
         ffffffff                                                          -> workchain:int
         17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb05569  -> root_hash:int256      
         5e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e  -> file_hash:int256
-    000000                                                                -> падинг 3 байта
+    000000                                                                -> 3 個填充字節
 520c46d1ea4daccdf27ae21750ff4982d59a30672b3ce8674195e8a23e270d21          -> sha256
 ```
 
 ##### runSmcMethod
-Мы уже умеем получать блок мастерчеина, значит теперь мы можем вызывать любые методы лайт-сервера.
-Разберем **runSmcMethod** - это метод, который вызывает функцию из смарт контракта и возвращает результат. Здесь нам потребуется понять некоторые новые типы данных, такие как [TL-B](/TL-B.md), [Cell](https://ton.org/docs/learn/overviews/Cells) и [BoC](/Cells-BoC.md#bag-of-cells).
 
-Для выполнения метода смарт-контракта нам нужно отправить запрос по TL схеме:
+現在我們已經知道如何獲取主控鏈區塊，所以我們可以調用任何一個 Lite API 的方法。
+讓我們來看看 **runSmcMethod**，它是一個調用智能合約函數並返回結果的方法。在這裡，我們需要理解一些新的數據類型，如 [TL-B](/TL-B.md)、[Cell](https://ton.org/docs/learn/overviews/Cells) 和 [BoC](/Cells-BoC.md#bag-of-cells)。
+
+執行智能合約方法，我們需要使用 TL schema 發送請求：
 `liteServer.runSmcMethod mode:# id:tonNode.blockIdExt account:liteServer.accountId method_id:long params:bytes = liteServer.RunMethodResult`
 
-И ждать ответ вида:
+然後等待以下格式的回應：
 `liteServer.runMethodResult mode:# id:tonNode.blockIdExt shardblk:tonNode.blockIdExt shard_proof:mode.0?bytes proof:mode.0?bytes state_proof:mode.1?bytes init_c7:mode.3?bytes lib_extras:mode.4?bytes exit_code:int result:mode.2?bytes = liteServer.RunMethodResult;`
 
-В запросе мы видим такие поля:
-1. mode:# - uint32 битовая маска того, что мы хотим видеть в ответе, например, result:mode.2?bytes будет присутствовать в ответе только, если бит с индексом 2 равен единице.
-2. id:tonNode.blockIdExt - наш стейт мастер блока, который мы получили в прошлой главе.
-3. account:[liteServer.accountId](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L27) - воркчеин и данные адреса смарт контракта.
-4. method_id:long - 8 байт, в которых пишется crc16 с таблицей XMODEM от имени вызываемого метода и установленый 17й бит [[Расчет]](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16)
-5. params:bytes - [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783) сериализованый в [BoC](/Cells-BoC.md#bag-of-cells), содержащий аргументы для вызова метода. [[Пример реализации]](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/tlb/stack.go)
+在請求中，我們看到以下字段：
 
-Например, нам нужен только `result:mode.2?bytes`, тогда наш mode будет равен 0b100, то есть 4. В ответ мы получим:
-1. mode:# -> то, что и отправляли, - 4.
-2. id:tonNode.blockIdExt -> наш мастер блок, относительно которого был выполнен метод
-3. shardblk:tonNode.blockIdExt -> шард блок, в котором находится аккаунт контракта
-4. exit_code:int -> 4 байта, которые являются кодом выхода при выполнении метода. Если все успешно, то = 0, если нет - равен коду исключения
-5. result:mode.2?bytes -> [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783) сериализованый в [BoC](/Cells-BoC.md#bag-of-cells), содержащий возвращенные методом значения.
+1. mode:# - uint32 位元遮罩，表示我們要在回應中看到什麼。例如，只有當索引為 2 的位元等於 1 時，result:mode.2?bytes 才會出現在回應中。
+2. id:tonNode.blockIdExt - 我們在前一章中收到的主區塊狀態。
+3. account:[liteServer.accountId](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L27) - 智能合約地址的 workchain 和資料。
+4. method_id:long - 8 個位元組，其中寫入了從被調用方法的名稱計算的 crc16 和設置了第 17 個位元 [計算](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16)
+5. params:bytes - 序列化為 BoC 的 [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783) сериализованый в [BoC](/Cells-BoC.md#bag-of-cells)，包含呼叫方法的引數。[實作範例](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/tlb/stack.go)
 
-Разберем вызов и получение результата от метода `a2` контракта `EQBL2_3lMiyywU17g-or8N7v9hDmPCpttzBPE2isF2GTzpK4`:
+例如，我們只需要 `result:mode.2?bytes`，那麼我們的 mode 將等於 0b100，即 4。在回應中，我們將收到：
 
-Код метода на FunC:
+1. mode:# - 我們發送的值 - 4。
+2. id:tonNode.blockIdExt - 我們的主區塊，相對於該區塊執行方
+3. shardblk:tonNode.blockIdExt - 合約帳戶所在的 shard 區塊
+4. exit_code:int - 執行方法時的 4 個字節的退出代碼。如果一切順利，它將是 0，如果不是，它將等於異常代碼
+5. result:mode.2?bytes - 序列化為 [BoC](/Cells-BoC.md#bag-of-cells) 的 [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783)，包含方法返回的值。
+
+
+讓我們看一下從 `EQBL2_3lMiyywU17g-or8N7v9hDmPCpttzBPE2isF2GTzpK4` 合約的 `a2` 方法調用和結果檢索：
+
+FunC 中的方法代碼：
 ```
 (cell, cell) a2() method_id {
   cell a = begin_cell().store_uint(0xAABBCC8, 32).end_cell();
@@ -177,12 +189,13 @@ ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
 }
 ```
 
-Заполняем наш запрос:
-* `mode` = 4, нам нужен только результат -> `04000000`
-* `id` = результат выполнения getMasterchainInfo
-* `account` = воркчеин 0 (4 байта `00000000`), и int256 [полученный из адреса нашего контракта](/Address.md#сериализация), то есть 32 байта `4bdbfde5322cb2c14d7b83ea2bf0deeff610e63c2a6db7304f1368ac176193ce`
-* `method_id` = [вычисленый](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16) id от `a2` -> `0a2e010000000000`
-* `params:bytes` = Наш метод не принимает входных параметров, значит нам нужно передать ему пустой стек (`000000`, ячейка 3 байта - стек 0 глубины) сериализованый в [BoC](/Cells-BoC.md#bag-of-cells) -> `b5ee9c72010101010005000006000000` -> сериализуем в bytes и получаем `10b5ee9c72410101010005000006000000000000` 0x10 - размер, 3 байта в конце - падинг.
+我們填寫我們的請求：
+* `mode` = 4, 我們只需要結果  -> `04000000`
+* `id` = getMasterchainInfo 執行的結果
+* `account` = 工作鏈 0 (4 字節 `00000000`), 以及從我們[合約地址](/Address.md#сериализация)獲取的 int256，即 32 字節 
+`4bdbfde5322cb2c14d7b83ea2bf0deeff610e63c2a6db7304f1368ac176193ce`
+* `method_id` = 從 `a2` [計算](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16) 出的 id -> `0a2e010000000000`
+* `params：bytes` = 我們的方法不需要任何輸入參數，因此我們需要傳遞一個序列化為 BoC 的空堆疊（`000000`，3 字節單元格 - 深度為 0 的堆疊）-> `b5ee9c72010101010005000006000000`-> 序列化為字節並獲取 `10b5ee9c72410101010005000006000000000000` 0x10 - 大小，末尾 3 個字節 - 填充。
 
 В ответе получаем:
 * `mode:#` -> не интересен
@@ -459,6 +472,7 @@ currencies$_ grams:Grams other:ExtraCurrencyCollection = CurrencyCollection;
 ## Дополнительные технические детали хендшейка
 
 #### Получение айди ключа
+<!-- 對應[32 字節] 伺服器金鑰 ID  -->
 Айди ключа - это SHA256 хэш сериализованой TL схемы.
 
 Чаще всего применяются следующие TL схемы:
@@ -476,6 +490,8 @@ pk.aes key:int256 = PrivateKey     -- ID 3751e8a5
 [Пример кода](https://github.com/xssnick/tonutils-go/blob/2b5e5a0e6ceaf3f28309b0833cb45de81c580acc/liteclient/crypto.go#L16)
 
 #### Шифрование данных Handshake пакета
+
+<!-- 上方資訊呼應 -->
 Хэндшейк пакет отправляется в полуоткрытом виде, зашифрованы только 160 байт, содержащие информацию о постоянных шифрах.
 
 Чтобы их зашифровать, нам нужен AES-CTR шифр, для его получения нам нужен SHA256 хэш от 160 байт и [общий ключ ECDH](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BE%D0%B1%D1%89%D0%B5%D0%B3%D0%BE-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0-%D0%BF%D0%BE-ecdh)

@@ -1,10 +1,9 @@
 # TL-B
 
-本節中將單獨討論複雜和不明顯的TL-B結構。建議首先閱讀[基礎文檔](https://github.com/tonstack/ton-docs/tree/main/TL-B)。
+本節中將單獨討論複雜和不明顯的 TL-B 結構。建議首先閱讀[基礎文檔](https://github.com/tonstack/ton-docs/tree/main/TL-B)。
 
 ### Unary
 Unary 通常用於定義動態大小的結構，例如 [hml_short](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L29)。
-
 
 Unary 有兩個變體：
 ```
@@ -51,7 +50,7 @@ pair$_ {X:Type} {Y:Type} first:X second:Y = Both X Y;
 
 ### Hashmap
 
-以 `Hashmap` 為例，這是一個用於存儲智能合約 FunC 代碼中的 `dict` 的結構，可以展示如何處理複雜的 TL-B 結構。
+以 `Hashmap` 為例，這是一個用於儲存智能合約 FunC 代碼中的 `dict` 的結構，可以展示如何處理複雜的 TL-B 結構。
 
 以下是使用固定長度金鑰序列化 Hashmap 所使用的 TL-B 結構：
 
@@ -98,14 +97,20 @@ hme_root$1 {n:#} {X:Type} root:^(Hashmap n X) = HashmapE n X;
 128 = 777
 ```
 
-要解析它，我們需要預先知道要使用哪個結構，`hme_empty` 還是 `hme_root`。我們可以根據前綴來確定，對於 hme_empty，其前綴的第一位為 `0（hme_empty$0）`，對於 hme_root，其前綴的第一位為 1（`hme_root$1`）。我們讀取第一位，它等於 `1（1[1]）`，因此我們面前的是 `hme_root`。
+要解析它，我們需要預先知道要使用哪個結構，`hme_empty` 還是 `hme_root`。我們可以根據前綴來確定，對於 hme_empty，其前綴的第一位為 `0（hme_empty$0）`，對於 hme_root，其前綴的第一位為 1（`hme_root$1`）。
 
+我們讀取第一位，它等於 `1（1[1]）`，因此我們面前的是 `hme_root`。
 
 我們使用已知的值填充結構變量，得到：
 `hme_root$1 {n:#} {X:Type} root:^(Hashmap 8 uint16) = HashmapE 8 uint16;`
 
-前綴的第一位已經被讀取，括號內的內容是條件，不需要被讀取。 (`{n:#}` 表示 n 是任何 uint32 數字，`{X:Type}` 表示 X 是任何類型。) 我們需要讀取的下一個內容是 `root:^(Hashmap 8 uint16)`，其中 `^` 表示引用，我們加載它。我們得到：
+前綴的第一位已經被讀取，括號內的內容是條件，不需要被讀取。 
 
+(`{n:#}` 表示 n 是任何 uint32 數字，`{X:Type}` 表示 X 是任何類型。) 
+
+我們需要讀取的下一個內容是 `root:^(Hashmap 8 uint16)`，其中 `^` 表示引用，我們加載它。
+
+我們得到：
 ```
 2[00] -> {
     7[1001000] -> {
@@ -115,25 +120,33 @@ hme_root$1 {n:#} {X:Type} root:^(Hashmap n X) = HashmapE n X;
     28[1011100000000000001100001001]
   }
 ```
-
 ##### 開始解析哈希表的分支
 
-根據我們的 TL-B 結構，這是一個 `Hashmap 8 uint16` 的結構。填寫我們知道的值，我們得到：
+根據我們的 TL-B 結構，這是一個 `Hashmap 8 uint16` 的結構。
+
+填寫我們知道的值，我們得到：
 ```
 hm_edge#_ {n:#} {X:Type} {l:#} {m:#} label:(HmLabel ~l 8) 
           {8 = (~m) + l} node:(HashmapNode m uint16) = Hashmap 8 uint16;
 ```
 
-正如我們所看到的，出現了條件變量 `{l:#}` 和 `{m:#}`，它們的值是我們不知道的。此外，在讀取了 `label` 後，n 在等式 `{n = (~m) + l}` 中參與其中，在這種情況下，我們可以計算出 `l` 和 `m`，這就是 `~` 的含義。
+正如我們所看到的，出現了條件變量 `{l:#}` 和 `{m:#}`，它們的值是我們不知道的。
 
-為了確定 `l` 的值，我們需要加載 `label:(HmLabel ~l uint16)`。`HmLabel` 有三種結構：
+此外，在讀取了 `label` 後，n 在等式 `{n = (~m) + l}` 中參與其中，在這種情況下，我們可以計算出 `l` 和 `m`，這就是 `~` 的含義。
 
+為了確定 `l` 的值，我們需要加載 `label:(HmLabel ~l uint16)`。
+
+`HmLabel` 有三種結構：
 ```
 hml_short$0 {m:#} {n:#} len:(Unary ~n) {n <= m} s:(n * Bit) = HmLabel ~n m;
 hml_long$10 {m:#} n:(#<= m) s:(n * Bit) = HmLabel ~n m;
 hml_same$11 {m:#} v:Bit n:(#<= m) = HmLabel ~n m;
 ```
-結構的選擇基於其前綴。在我們目前的根元素中，有 2 個零位元`（2[00]）`。我們只有一個選擇，該選擇的前綴以 0 開始。因此，我們面前的結構是 `hml_short$0`。
+結構的選擇基於其前綴。在我們目前的根元素中，有 2 個零位元`(2[00])`。
+
+我們只有一個選擇，該選擇的前綴以 0 開始。
+
+因此，我們面前的結構是 `hml_short$0`。
 
 填寫 `hml_short` 中已知的值：
 ```
@@ -172,7 +185,9 @@ hmn_fork#_ {n:#} {X:Type} left:^(Hashmap n X)
            right:^(Hashmap n X) = HashmapNode (n + 1) X;
 ```
 
-在這種情況下，我們根據參數而不是前綴來確定變體。如果 n=0，則為 `hmn_leaf`，否則為 `hmn_fork`。
+在這種情況下，我們根據參數而不是前綴來確定變體。
+
+如果 n=0，則為 `hmn_leaf`，否則為 `hmn_fork`。
 
 在我們的情況下，n=8，因此為 `hmn_fork`。
 
@@ -181,6 +196,7 @@ hmn_fork#_ {n:#} {X:Type} left:^(Hashmap n X)
 hmn_fork#_ {n:#} {X:uint16} left:^(Hashmap n uint16) 
            right:^(Hashmap n uint16) = HashmapNode (n + 1) uint16;
 ```
+
 這裡不是很明顯，我們有一個 `HashmapNode (n+1)uint16`。
 
 這意味著結果中的 n 必須等於我們的參數即 8. 要計算本地 n ，需要計算它：`n=(local_n+1)` -> `local_n=(n-1)` -> `local_n=(8-1)`-> `local_n=7`。

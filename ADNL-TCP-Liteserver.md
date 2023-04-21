@@ -1,4 +1,3 @@
-
 ## ADNL TCP + Liteserver
 
 ADNL TCP + Liteserver 是 TON 網路中構建所有互動的底層協議，它可以在任何協議上運作，但通常在 TCP 和 UDP 協議上運作。
@@ -7,22 +6,28 @@ UDP 用於節點之間的通訊，而 TCP 用於與輕型伺服器通訊。
 
 現在我們將介紹在 TCP 上運作的 ADNL，並學習如何直接與輕型伺服器進行互動。
 
-在 ADNL 的 TCP 版本中，網路節點使用公鑰 ed25519 作為地址，並使用橢圓曲線 Diffie-Hellman 程序獲取的共享密鑰建立連接。
+在 ADNL 的 TCP 版本中，網路節點使用公鑰 ed25519 作為地址，並使用橢圓曲線 Diffie-Hellman 程序獲取的共享金鑰建立連接。
 
 ### 封包結構
 
 除了握手機制（Handshake）封包之外，每個 ADNL TCP 包都具有以下結構：
 
 * 4 個位元組的 little endian 格式的封包大小（N）
-* 32 個位元組的 nonce（以防校驗和攻擊）
+* 32 個位元組的 Nonce（以防校驗和攻擊）
 * (N-64) 位元組的有效資料
-* 32 個位元組的 SHA256 校驗用於 nonce 和有效資料
+* 32 個位元組的 SHA256 校驗用於 Nonce 和有效資料
 
-整個封包，包括大小，都使用 AES-CTR 加密。在解密後，必須驗證校驗和是否與資料相符。為了進行驗證，只需自行計算校驗和並將結果與包中的校驗和進行比較。
+整個封包，包括大小，都使用 AES-CTR 加密。
+
+在解密後，必須驗證校驗和是否與資料相符。
+
+為了進行驗證，只需自行計算校驗和並將結果與包中的校驗和進行比較。
 
 握手包是個例外，它以部分開放的形式傳遞，並在下一節中進行描述。
 
-整個封包，包括尺寸，都是使用 **AES-CTR** 加密的。在解密後，必須確認檢查和是否與資料相符，檢查和可以自行計算並與封包中的結果進行比較以進行確認。
+整個封包，包括尺寸，都是使用 **AES-CTR** 加密的。
+
+在解密後，必須確認檢查和是否與資料相符，檢查和可以自行計算並與封包中的結果進行比較以進行確認。
 
 握手封包是一個例外，它是以部分開放的方式傳輸的，並在下一節中進行了描述。
 
@@ -48,12 +53,12 @@ UDP 用於節點之間的通訊，而 TCP 用於與輕型伺服器通訊。
 * 伺服器使用加密 B 解密收到的消息。
 為了建立連接，客戶端必須發送一個握手封包，其中包含：
 
-* [32 字節] 伺服器金鑰 ID [更多資訊](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B0%D0%B9%D0%B4%D0%B8-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0)
-* [32 字節] 我們的 ed25519 公鑰
-* [32 字節] 我們 160 字節的 SHA256 哈希值
-* [160 字節] 我們的 160 字節加密後的數據 [更多資訊](#%D1%88%D0%B8%D1%84%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-handshake-%D0%BF%D0%B0%D0%BA%D0%B5%D1%82%D0%B0)
+* [32 位元組] 伺服器金鑰 ID [更多資訊](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B0%D0%B9%D0%B4%D0%B8-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0)
+* [32 位元組] 我們的 ed25519 公鑰
+* [32 位元組] 我們 160 位元組的 SHA256 哈希值
+* [160 位元組] 我們的 160 位元組加密後的數據 [更多資訊](#%D1%88%D0%B8%D1%84%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-handshake-%D0%BF%D0%B0%D0%BA%D0%B5%D1%82%D0%B0)
 
-接收到握手包後，伺服器在自己端進行同樣的操作，獲取 ECDH 金鑰，解密 160 個字節並創建 2 個永久的金鑰。
+接收到握手包後，伺服器在自己端進行同樣的操作，獲取 ECDH 金鑰，解密 160 個位元組並創建 2 個永久的金鑰。
 
 如果一切順利，伺服器將回傳一個空的 ADNL 包，沒有有效數據，為了解密它（以及後續的數據），需要使用其中一個永久加密。
 
@@ -62,25 +67,28 @@ UDP 用於節點之間的通訊，而 TCP 用於與輕型伺服器通訊。
 ## 數據交換
 
 在建立連接後，可以開始接收訊息，使用 TL 語言進行數據序列化。
-[更多關於 TL 的資訊]((/TL.md))
+
+[更多關於 TL 的資訊](/TL.md)
 
 ### Ping & Pong
 
 Ping 封包最好每 5 秒左右發送一次，以維持連接，如果在交換數據之前沒有發送，則伺服器將斷開連接。
 
-Ping 包和其他包一樣，遵循 [上面](#структура-пакетов) 描述的標準方案，其有效數據包括 ID 和請求 ID。
+Ping 封包和其他封包一樣，遵循 [上面](#структура-пакетов) 描述的標準方案，其有效數據包括 ID 和請求 ID。
 
-可以在 [這裡](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L35) 找到 ping 請求的正確方案，並計算方案 ID，如下所示：`crc32_IEEEE("tcp.ping random_id:long = tcp.Pong")`。在使用小端序轉換為字節時，ID 為 **9a2b084d**。
+可以在[這裡](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L35)找到 ping 請求的正確方案，並計算方案 ID，如下所示：`crc32_IEEEE("tcp.ping random_id:long = tcp.Pong")`。
+
+將其轉換為 little endian 的位元組後，得到的值為  **9a2b084d**。
 
 因此，我們的 ADNL ping 包將如下所示：
 
-* 4 字節的小端序包大小 -> 64 + (4+8) = 76
-* 32 字節的 nonce -> 32 個隨機字節
-* 4 字節的 TL 方案 ID -> **9a2b084d**
-* 8 字節的請求 ID -> 隨機 uint64 數字
-* SHA256 摘要的 32 個字節，是由 nonce 和有用的數據計算而得
+* 4 個位元組的封包大小（little endian 格式）-> 64 + (4+8) = 76
+* 32 個位元組的 Nonce -> 隨機生成的 32 個位元組
+* 4 個位元組的 TL 方案 ID -> **9a2b084d**
+* 8 個位元組的請求 ID -> 隨機生成的 uint64 數字
+* 32 個位元組的 SHA256 校驗和，從 Nonce 和有效數據中計算得到
 
-我們發送我們的包，然後等待回覆的 [tcp.pong](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L23)，其中的 `random_id` 將等於我們發送的 ping 的值。
+我們發送這個封包，然後等待 [tcp.pong](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/ton_api.tl#L23) 的回應，其中 `random_id` 將等於我們在 ping 中發送的 random_id。
 
 ### 從輕量級服務器獲取訊息
 
@@ -94,39 +102,41 @@ ADNLQuery:
 
 LiteQuery 被傳遞到 ADNLQuery 內部作為 `query:bytes`，最終請求作為 `data:bytes` 在 LiteQuery 內部傳遞。
 
-[TL 中的字節編碼解析](/TL.md)
+[TL 中的位元組編碼解析](/TL.md)
 
 #### 獲取有用數據
 
-現在，由於我們已經知道如何為 Lite API 構建 TL 包，我們可以請求有關 TON 主控鏈當前區塊的資訊。主控鏈區塊在許多後續請求中都被用作輸入參數，用於指示我們需要的訊息狀態（時間點）。
+現在，由於我們已經知道如何為 Lite API 構建 TL 封包，我們可以請求有關 TON 主鏈當前區塊的資訊。
+
+主鏈區塊在許多後續請求中都被用作輸入參數，用於指示我們需要的訊息狀態（時間點）。
 
 ##### getMasterchainInfo
 尋找我們需要的 [TL 方案](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L60)，計算其 ID 並構建封包：
 
-* 4個字節的封包大小（little endian）-> 64 + (4+32+(1+4+(1+4+3)+3)) = **116**
-* 32 個字節的 nonce -> 隨機的 32 個字節
-* 4個字節的 ADNLQuery 方案ID -> **7af98bb4**
-* 32個字節的 `query_id:int256` -> 隨機的32個字節
-* 1 個字節的數組大小 -> **12**
-* 4 個字節的 LiteQuery 方案 ID -> **df068c79**
-* 1個字節的數組大小 -> **4**
-* 4 個字節的 getMasterchainInfo 方案 ID -> **2ee6b589**
-* 3 個零填充字節（按 8 字節對齊）
-* 3 個零填充字節（按 16 字節對齊）
-* 32 個字節 SHA256 摘要的校驗和，由 nonce 和有用的數據計算而得。
+* 4 個位元組的封包大小（little endian）-> 64 + (4+32+(1+4+(1+4+3)+3)) = **116**
+* 32 個位元組的 Nonce -> 隨機生成的 32 個位元組
+* 4 個位元組的 ID ADNLQuery 方案 -> **7af98bb4**
+* 32 個位元組的 `query_id:int256` -> 隨機的 32 個位元組
+* 1 個位元組的數組大小 -> **12**
+* 4 個位元組的 ID LiteQuery 方案 -> **df068c79**
+* 1 個位元組的數組大小 -> **4**
+* 4 個位元組的 getMasterchainInfo 方案 ID -> **2ee6b589**
+* 3 個零位填充位元組（按 8 位元組對齊）
+* 3 個零位填充位元組（按 16 位元組對齊）
+* 32 個位元組 SHA256 摘要的校驗和，由 Nonce 和有用的數據計算而得。
 
 封包的十六進位範例
 ```
 74000000                                                             -> 封包大小 (116)
-5fb13e11977cb5cff0fbf7f23f674d734cb7c4bf01322c5e6b928c5d8ea09cfd     -> nonce
+5fb13e11977cb5cff0fbf7f23f674d734cb7c4bf01322c5e6b928c5d8ea09cfd     -> Nonce
   7af98bb4                                                           -> ADNLQuery
   77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4   -> query_id
     0c                                                               -> 陣列大小
     df068c79                                                         -> LiteQuery
       04                                                             -> 陣列大小
       2ee6b589                                                       -> getMasterchainInfo
-      000000                                                         -> 3 個填充字節
-    000000                                                           -> 3 個填充字節
+      000000                                                         -> 3 個填充位元組
+    000000                                                           -> 3 個填充位元組
 ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
 ```
 
@@ -134,10 +144,10 @@ ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
 
 獲得的封包與發送的封包以相同的方式反序列化 - 使用相同的算法，只是反過來，唯一的區別在於回覆僅被封裝在 [ADNLAnswer](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L23) 內。
 
-После расшифровки ответа, получаем пакет вида:
+解碼響應後，我們得到以下形式的數據封包：
 ```
 20010000                                                                  -> 封包大小 (288)
-5558b3227092e39782bd4ff9ef74bee875ab2b0661cf17efdfcd4da4e53e78e6          -> nonce
+5558b3227092e39782bd4ff9ef74bee875ab2b0661cf17efdfcd4da4e53e78e6          -> Nonce
   1684ac0f                                                                -> ADNLAnswer
   77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4        -> query_id (與請求相同)
     b8                                                                    -> 數組大小
@@ -153,13 +163,13 @@ ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
         ffffffff                                                          -> workchain:int
         17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb05569  -> root_hash:int256      
         5e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e  -> file_hash:int256
-    000000                                                                -> 3 個填充字節
+    000000                                                                -> 3 個填充位元組
 520c46d1ea4daccdf27ae21750ff4982d59a30672b3ce8674195e8a23e270d21          -> sha256
 ```
 
 ##### runSmcMethod
 
-現在我們已經知道如何獲取主控鏈區塊，所以我們可以調用任何一個 Lite API 的方法。
+現在我們已經知道如何獲取主鏈區塊，所以我們可以調用任何一個 Lite API 的方法。
 讓我們來看看 **runSmcMethod**，它是一個調用智能合約函數並返回結果的方法。在這裡，我們需要理解一些新的數據類型，如 [TL-B](/TL-B.md)、[Cell](https://ton.org/docs/learn/overviews/Cells) 和 [BoC](/Cells-BoC.md#bag-of-cells)。
 
 執行智能合約方法，我們需要使用 TL schema 發送請求：
@@ -171,17 +181,18 @@ ac2253594c86bd308ed631d57a63db4ab21279e9382e416128b58ee95897e164     -> sha256
 在請求中，我們看到以下字段：
 
 1. mode:# - uint32 位元遮罩，表示我們要在回應中看到什麼。例如，只有當索引為 2 的位元等於 1 時，result:mode.2?bytes 才會出現在回應中。
-2. id:tonNode.blockIdExt - 我們在前一章中收到的主區塊狀態。
+2. id:tonNode.blockIdExt - 我們在前一章中收到的主鏈區塊狀態。
 3. account:[liteServer.accountId](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L27) - 智能合約地址的 workchain 和資料。
 4. method_id:long - 8 個位元組，其中寫入了從被調用方法的名稱計算的 crc16 和設置了第 17 個位元 [計算](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16)
-5. params:bytes - 序列化為 BoC 的 [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783) сериализованый в [BoC](/Cells-BoC.md#bag-of-cells)，包含呼叫方法的引數。[實作範例](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/tlb/stack.go)
+5. params:bytes - 序列化為 BoC 的 [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783) [BoC](/Cells-BoC.md#bag-of-cells)，包含呼叫方法的引數。[實作範例](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/tlb/stack.go)
 
-例如，我們只需要 `result:mode.2?bytes`，那麼我們的 mode 將等於 0b100，即 4。在回應中，我們將收到：
+例如，我們只需要 `result:mode.2?bytes`，那麼我們的 mode 將等於 0b100，即 4。
 
+在回應中，我們將收到：
 1. mode:# - 我們發送的值 - 4。
 2. id:tonNode.blockIdExt - 我們的主區塊，相對於該區塊執行方
 3. shardblk:tonNode.blockIdExt - 合約帳戶所在的 shard 區塊
-4. exit_code:int - 執行方法時的 4 個字節的退出程式碼。如果一切順利，它將是 0，如果不是，它將等於異常程式碼
+4. exit_code:int - 執行方法時的 4 個位元組的退出程式碼。如果一切順利，它將是 0，如果不是，它將等於異常程式碼
 5. result:mode.2?bytes - 序列化為 [BoC](/Cells-BoC.md#bag-of-cells) 的 [Stack](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L783)，包含方法返回的值。
 
 
@@ -199,10 +210,10 @@ FunC 中的方法程式碼：
 我們填寫我們的請求：
 * `mode` = 4, 我們只需要結果  -> `04000000`
 * `id` = getMasterchainInfo 執行的結果
-* `account` = 工作鏈 0 (4 字節 `00000000`), 以及從我們[合約地址](/Address.md#сериализация)獲取的 int256，即 32 字節 
+* `account` = 工作鏈 0 (4 位元組 `00000000`), 以及從我們[合約地址](/Address.md#сериализация)獲取的 int256，即 32 位元組 
 `4bdbfde5322cb2c14d7b83ea2bf0deeff610e63c2a6db7304f1368ac176193ce`
 * `method_id` = 從 `a2` [計算](https://github.com/xssnick/tonutils-go/blob/88f83bc3554ca78453dd1a42e9e9ea82554e3dd2/ton/runmethod.go#L16) 出的 id -> `0a2e010000000000`
-* `params：bytes` = 我們的方法不需要任何輸入參數，因此我們需要傳遞一個序列化為 BoC 的空堆疊（`000000`，3 字節單元格 - 深度為 0 的堆疊）-> `b5ee9c72010101010005000006000000`-> 序列化為字節並獲取 `10b5ee9c72410101010005000006000000000000` 0x10 - 大小，末尾 3 個字節 - 填充。
+* `params：bytes` = 我們的方法不需要任何輸入參數，因此我們需要傳遞一個序列化為 BoC 的空堆疊（`000000`，3 位元組單元格 - 深度為 0 的堆疊）-> `b5ee9c72010101010005000006000000`-> 序列化為位元組並獲取 `10b5ee9c72410101010005000006000000000000` 0x10 - 大小，末尾 3 個位元組 - 填充。
 
 我們得到的回覆如下：
 
@@ -224,12 +235,14 @@ FunC 中的方法程式碼：
   32[0CCFFCC1]
 }
 ```
-如果我們對其進行解析，就會得到我們的 FunC 方法返回的 2 個 cell 值。根單元格的前 3 個字節 `000002` 是堆棧深度，即為 2。
+如果我們對其進行解析，就會得到我們的 FunC 方法返回的 2 個 cell 值。根單元格的前 3 個位元組 `000002` 是堆棧深度，即為 2。
 這意味著該方法返回了 2 個值。
 
-繼續解析，下一個 8 個位元組（1 個字節）是當前堆棧層級上的值類型。
+繼續解析，下一個 8 個位元組（1 個位元組）是當前堆棧層級上的值類型。
 
-對於某些類型，它可能佔用 2 個字節。可以在 [模式](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L766) 中查看可能的選項。在這種情況下，我們得到了 `03`，這表示：
+對於某些類型，它可能佔用 2 個位元組。
+
+可以在[模式](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb#L766)中查看可能的選項。在這種情況下，我們得到了 `03`，這表示：
 
 
 ```
@@ -251,15 +264,17 @@ vm_stk_cons#_ {n:#} rest:^(VmStackList n) tos:VmStackValue = VmStackList (n + 1)
   }
 ```
 
-我們重複同樣的過程。前 8 個位元組為 03，即為 cell。第二個引用是值 `32[0AABBCC8]`，由於堆棧深度為 2，我們完成了遍歷。因此，我們得到了合約返回的 2 個值：`32[0CCFFCC1]` 和 `32[0AABBCC8]`。
+我們重複同樣的過程。前 8 個位元組是 03 - 也就是說又是 cell。第二個連接的值是 `32[0AABBCC8]`，由於我們的堆棧深度為 2，所以我們結束了這次遍歷。總結來說，我們有兩個由合約返回的值 - `32[0CCFFCC1]` 和 `32[0AABBCC8]`。
 
-請注意，它們是以相反的順序出現的。當調用函數時，也必須以與 FunC 程式碼中所見相反的順序傳遞引數。
+請注意，它們是反向的。在調用函數時，同樣需要將參數按與我們在 FunC 代碼中看到的相反的順序傳遞。
 
 [實現範例](https://github.com/xssnick/tonutils-go/blob/master/ton/runmethod.go#L24)
 
 ##### getAccountState
 
-要獲取帳戶狀態的數據，例如餘額、程式碼和儲存的數據，我們可以使用 [getAccountState](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L68) 方法。我們需要提供一個最新的主區塊和帳戶地址進行請求。
+要獲取帳戶狀態的數據，例如餘額、程式碼和儲存的數據，我們可以使用 [getAccountState](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L68) 方法。
+
+我們需要提供一個最新的主區塊和帳戶地址進行請求。
 
 作為回覆，我們將獲得 TL 結構  [AccountState](https://github.com/ton-blockchain/ton/blob/master/tl/generate/scheme/lite_api.tl#L38)。
 
@@ -428,7 +443,11 @@ C0021137B0BC47669B3267F1DE70CBB0CEF5C728B8D8C7890451E8613B2D899827026A886043179D
 ```
 11000000000000100001000100110111101100001011110001000111011001101001101100110010011001111111000111011110011100001100101110110000110011101111010111000111001010001011100011011000110001111000100100000100010100011110100001100001001110110010110110001001100110000010011100000010011010101000100001100000010000110001011110011101001111110110000000000000000000000110111000100011001110111110100001110010001000100000000111010111110100100011100111011011101001111101100000011000000100110
 ```
-讓我們看看我們的主要 TL-B 結構，我們看到我們有 2 個選項可以選擇 - `account_none$0` 或 `account$1`。 我們可以通過閱讀 $ 符號後聲明的前綴來了解我們有哪個選項，在我們的例子中它是 1 位。 如果有 0，則我們有 `account_none`，如果有 1，則有 `account`。
+讓我們看看我們的主要 TL-B 結構，我們看到我們有 2 個選項可以選擇 - `account_none$0` 或 `account$1`。 
+
+我們可以通過閱讀 $ 符號後聲明的前綴來了解我們有哪個選項，在我們的例子中它是 1 位。 
+
+如果有 0，則我們有 `account_none`，如果有 1，則有 `account`。
 
 上面數據的第一位 = 1，所以我們正在使用 account$1 並將使用該方案：
 ```
@@ -442,15 +461,19 @@ addr_var$11 任播：（可能是任播）addr_len：（## 9）workchain_id：in
 ```
 為了了解使用哪一個，我們像上次一樣讀取前綴位，這次我們讀取 2 位。 
 
-我們切斷了已經讀取的位，"1000000..." 仍然存在，我們讀取前 2 位並得到 "10"，這意味著我們正在使用“addr_std$10”。
+我們切斷了已經讀取的位，"1000000..." 仍然存在，我們讀取前 2 位並得到 "10"，這意味著我們正在使用 `addr_std$10`。
 
 接下來我們需要解析`anycast:(Maybe Anycast)`，Maybe 表示應該讀取 1 位，如果有則讀取 Anycast，否則跳過。 
 
 我們剩下的位是 `00000...`，讀取 1 位，它是 0，所以我們跳過 Anycast。
 
-接下來，我們有 `workchain_id: int8`，這裡一切都很簡單，我們讀取 8 位，這將是工作鏈 ID。 我們讀取接下來的 8 位，全為 0，因此工作鍊為 0。
+接下來，我們有 `workchain_id: int8`，這裡一切都很簡單，我們讀取 8 位，這將是工作鏈 ID。 
 
-接下來，我們讀取 address:bits256，這是地址的 256 位，與 workchain_id 相同。 閱讀時，我們得到十六進製表示形式的“21137B0BC47669B3267F1DE70CBB0CEF5C728B8D8C7890451E8613B2D8998270”。
+我們讀取接下來的 8 位，全為 0，因此工作鏈為 0。
+
+接下來，我們讀取 address:bits256，這是地址的 256 位，與 workchain_id 相同。 
+
+閱讀時，我們得到十六進制表示形式的`21137B0BC47669B3267F1DE70CBB0CEF5C728B8D8C7890451E8613B2D8998270`。
 
 
 
@@ -474,9 +497,11 @@ var_uint$_ {n:#} len:(#< n) value:(uint (len * 8)) = VarUInteger n;
 
 在 len 中我們將有 `(#< 7)`，這意味著可以容納最多 7 個數字的位數。
 
-您可以通過將 7-1=6 轉換為來確定它二進制形式 - `110`，我們得到 3 位，所以長度 len = 3 位。 值是`(uint (len * 8))`。 
+您可以通過將 7-1=6 轉換為來確定它二進制形式 - `110`，我們得到 3 位，所以長度 len = 3 位。 
 
-為了確定它，我們需要讀取長度的 3 位，得到一個數字並乘以 8，這將是 value 的大小，即需要讀取的位數才能獲得 VarUInteger 的值.
+值是`(uint (len * 8))`。 
+
+為了確定它，我們需要讀取長度的 3 位，得到一個數字並乘以 8，這將是值的大小，即需要讀取的位數才能獲得 VarUInteger 的值.
 
 讀取 `cells:(VarUInteger 7)`，從根單元格中取出我們接下來的位，看接下來的 16 位就明白了，這是 `0010011010101000`。 
 我們讀取 len 的前 3 位，這是 `001`，即 1，我們得到大小 (uint (1 * 8))，我們得到 uint 8，我們讀取 8 位，它將是 `cells`，`00110101 `，即十進制形式的 53。 
@@ -495,76 +520,81 @@ var_uint$_ {n:#} len:(#< n) value:(uint (len * 8)) = VarUInteger n;
 ```
 account_storage$_ last_trans_lt:uint64 balance:CurrencyCollection state:AccountState = AccountStorage;
 ```
-我們讀到 `last_trans_lt:uint64`，這是 64 位，儲存最後一個賬戶交易的 lt。 最後，由圖表表示的餘額：
+我們讀到 `last_trans_lt:uint64`，這是 64 位，儲存最後一個帳戶交易的 lt。 
+
+最後，由圖表表示的餘額：
 ```
 currencys$_grams:Grams 其他:ExtraCurrencyCollection = CurrencyCollection;
 ```
-從這裡我們將讀取“grams:Grams”，這將是納米色調的賬戶餘額。
-`grams:Grams`是`VarUInteger 16`，儲存16（二進制形式`10000`，減1得到`1111`），然後我們讀取前4位，並將結果值乘以8，然後我們讀取接收到的位數，這將是我們的餘額。
+從這裡我們將讀取 "grams:Grams"，這將是 Nano-Tones 的帳戶餘額。
+
+`grams:Grams`是`VarUInteger 16`，儲存 16（二進制形式`10000`，減 1 得到`1111`），然後我們讀取前 4 位，並將結果值乘以 8，然後我們讀取接收到的位數，這將是我們的餘額。
 
 讓我們分析一下我們數據的剩餘部分：
 ```
 100000000111010111110100100011100111011011101001111101100000011000000100110
 ```
-我們讀取前4位-`1000`，這是8。8*8=64，我們讀取接下來的64位=`00000111010111111010010001110011101101110100111110110000001100000` 1011011101001`1110000000等於, 531223439883591776`，並從 nano 轉換為 tone，我們得到`531223439.883591776`。
 
-到此為止，因為我們已經分析了所有的主要情況，其餘的可以通過與我們分析的類似的方式獲得。 此外，有關解析 TL-B 的其他訊息可以在 [官方文檔](/TL-B.md) 中找到
+我們讀取前 4 位數據為 1000，這表示 8。
 
-##### 其他方法
-現在，在研究了所有訊息後，您也可以調用和處理來自其他簡化服務器方法的響應。 同樣的原則:)
+8*8=64，然後我們讀取下一個 64 位數據，其值為 `0000011101011111010010001110011101101110100111110110000001100000`，刪除多餘的零位後，得到的值為 `11101011111010010001110011101101110100111110110000001100000`，這等於 `531223439883591776`，轉換成單位為 TON 後，為 `531223439.883591776`。
+
+由於我們已經研究了所有基本情況，因此我們將停止這裡，其他情況可以通過類似的方式進行獲取。
+
+此外，您可以在[官方文檔](/TL-B.md)中找到有關 TL-B 的其他訊息。
 
 ## 握手的其他技術細節
 
-#### 獲取 ID 密鑰
-<!-- 對應[32 字節] 伺服器金鑰 ID  -->
-密鑰 id 是序列化 TL 模式的 SHA256 哈希。
+#### 獲取 ID 金鑰
+<!-- 對應[32 位元組] 伺服器金鑰 ID  -->
+金鑰 id 是序列化 TL 模式的 SHA256 哈希。
 
 最常用的 TL 方案是：
 ```
 pub.ed25519 key:int256 = PublicKey -- ID c6b41348
 pub.aes key:int256 = PublicKey -- ID d4adbc2d
 pub.overlay name:bytes = PublicKey -- ID cb45ba34
-pub.unenc 數據：字節 = PublicKey -- ID 0a451fb6
-pk.aes 密鑰：int256 = 私鑰 -- ID 3751e8a5
+pub.unenc 數據：位元組 = PublicKey -- ID 0a451fb6
+pk.aes 金鑰：int256 = 私鑰 -- ID 3751e8a5
 ```
 
-例如，對於像 ED25519 這樣用於握手的密鑰，密鑰 ID 將是來自
+例如，對於像 ED25519 這樣用於握手的金鑰，金鑰 ID 將是來自
 **[0xC6, 0xB4, 0x13, 0x48]** 和 **public key**，(36 byte array, prefix + key)
 
 [程式碼範例](https://github.com/xssnick/tonutils-go/blob/2b5e5a0e6ceaf3f28309b0833cb45de81c580acc/liteclient/crypto.go#L16)
 
-#### 握手包數據加密
+#### 握手封包數據加密
 
-握手包以半開放形式發送，僅加密 160 字節，包含永久密碼訊息。
+握手封包以半開放形式發送，僅加密 160 位元組，包含永久密碼訊息。
 
-要加密它們，我們需要一個 AES-CTR 密碼，要獲得它，我們需要一個 160 字節的 SHA256 哈希和 [ECDH 共享密鑰](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BE%D0%B1%D1%89%D0%B5%D0%B3%D0%BE-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0-%D0%BF%D0%BE-ecdh)
+要加密它們，我們需要一個 AES-CTR 密碼，要獲得它，我們需要一個 160 位元組的 SHA256 哈希和 [ECDH 共享金鑰](#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BE%D0%B1%D1%89%D0%B5%D0%B3%D0%BE-%D0%BA%D0%BB%D1%8E%D1%87%D0%B0-%D0%BF%D0%BE-ecdh)
 
 密碼是這樣構建的：
 * key = (0 - 15 bytes of public key) + (16 - 31 bytes of hash)
-* iv = (0 - 3 個散列字節) + (20 - 31 個公鑰字節)
+* iv = (0 - 3 個散列位元組) + (20 - 31 個公鑰位元組)
 
-密碼組裝好後，我們用它加密我們的 160 個字節。
+密碼組裝好後，我們用它加密我們的 160 個位元組。
 
 [程式碼範例](https://github.com/xssnick/tonutils-go/blob/2b5e5a0e6ceaf3f28309b0833cb45de81c580acc/liteclient/connection.go#L361)
 
-#### 通過 ECDH 獲取共享密鑰
-要計算共享密鑰，我們需要我們的私鑰和服務器的公鑰。
+#### 通過 ECDH 獲取共同的金鑰
 
-DH 的本質是在不洩露隱私訊息的情況下獲得一個共享密鑰。 我將以最簡化的形式舉例說明這是如何發生的。
+DH（Diffie-Hellman）的核心思想在於獲取共同的秘密金鑰，而不泄露任何私人訊息。
 
-假設我們需要在我們和服務器之間生成一個共享密鑰，過程將是這樣的：
-1. 我們生成秘密和公共數字，如 **6** 和 **7**
-2. 服務器生成密號和公號，如 **5** 和 **15**
-3. 我們和服務器交換公眾號，發送 **7** 給服務器，它給我們發送**15**。
+以下是一個極簡化的例子，展示了如何在我們和服務器之間生成共同的金鑰：
+
+1. 我們生成一個秘密數和一個公共數，如 **6** 和 **7**
+2. 服務器生成一個秘密數和一個公共數，如 **5** 和 **15**
+3. 我們和服務器進行公共數的交換，我們把 **7** 發送給服務器，服務器將 **15** 回傳給我們。
 4. 我們計算：**7^6 mod 15 = 4**
 5. 服務器計算：**7^5 mod 15 = 7**
-6. 我們交換收到的號碼，我們給服務器 **4**，它給我們 **7**
+6. 我們和服務器交換計算出的數字，我們將 **4** 發送給服務器，服務器將 **7** 回傳給我們。
 7. 我們計算 **7^6 mod 15 = 4**
 8. 服務器計算：**4^5 mod 15 = 4**
-9. 共享密鑰 = **4**
+9. 共同的金鑰 = **4**
 
 為了簡單起見，將省略 ECDH 本身的細節。 
 
-它是使用 2 個密鑰（私有密鑰和公共密鑰）通過在曲線上找到一個公共點來計算的。 如果有興趣，最好單獨閱讀。
+它是使用 2 個金鑰（私有金鑰和公共金鑰）通過在曲線上找到一個公共點來計算的。 如果有興趣，最好單獨閱讀。
 
 [程式碼範例](https://github.com/xssnick/tonutils-go/blob/2b5e5a0e6ceaf3f28309b0833cb45de81c580acc/liteclient/crypto.go#L32)

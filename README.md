@@ -11,6 +11,7 @@
 * [節點如何相互發現 - DHT](/DHT.md)
 * [節點之間如何交換數據 - RLDP](/RLDP.md)
 * [分片鏈是如何工作的 - Overlays](/Overlay-Network.md)
+* [翻譯附錄](/appendix.md)
 
 ## Donate 
 - Translater : EQDkM7Tk8nQZG8sDyyQwu68HYnzrsDHMkeMMPIT6VDG0tY1l
